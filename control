@@ -1,0 +1,9 @@
+Package: com.openai.advancedautoclicker
+Name: AdvancedAutoClicker
+Version: 1.0.0
+Architecture: iphoneos-arm64
+Description: Generic advanced auto clicker for injected iOS apps.
+Maintainer: cocod
+Author: OpenAI-assisted project
+Section: Tweaks
+Depends: mobilesubstrate
