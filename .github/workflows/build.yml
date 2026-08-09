@@ -5,28 +5,25 @@ on:
   push:
     branches:
       - main
-      - master
-    tags:
-      - "v*"
-  pull_request:
-
-permissions:
-  contents: read
+    paths:
+      - "Tweak.x"
+      - "Makefile"
+      - "control"
+      - "layout/**"
+      - ".github/workflows/build.yml"
 
 jobs:
   build:
     name: Build iOS tweak
-    runs-on: macos-latest
-    timeout-minutes: 30
+    runs-on: macos-26
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          submodules: recursive
           fetch-depth: 1
 
-      - name: Select Xcode
+      - name: Show Xcode environment
         shell: bash
         run: |
           set -euo pipefail
@@ -44,55 +41,121 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+
           THEOS_DIR="$RUNNER_TEMP/theos"
-          git clone --recursive --depth 1 https://github.com/theos/theos.git "$THEOS_DIR"
+
+          git clone \
+            --recursive \
+            --depth 1 \
+            https://github.com/theos/theos.git \
+            "$THEOS_DIR"
+
           echo "THEOS=$THEOS_DIR" >> "$GITHUB_ENV"
 
-      - name: Verify source dependencies
+      - name: Download ZSFakeTouch
         shell: bash
         run: |
           set -euo pipefail
+
+          rm -rf ZSFakeTouch
+
+          git clone \
+            --depth 1 \
+            https://github.com/DYY-Studio/ZSFakeTouch.git \
+            ZSFakeTouch
+
+          echo "ZSFakeTouch contents:"
+          find ZSFakeTouch -maxdepth 5 -type f | sort
+
           test -f ZSFakeTouch/ZSFakeTouchDome/ZSFakeTouch/ZSFakeTouch.m
           test -f ZSFakeTouch/ZSFakeTouchDome/ZSFakeTouch/ZSFakeTouch.h
 
-      - name: Build tweak and package
+      - name: Clean previous build
         shell: bash
         run: |
           set -euo pipefail
-          make clean
+          make clean || true
+          rm -rf packages
+          rm -rf artifacts
+          mkdir -p artifacts
+
+      - name: Build tweak
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          export THEOS="$THEOS"
+
+          make FINALPACKAGE=1
+
+      - name: Build DEB package
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          export THEOS="$THEOS"
+
           make package FINALPACKAGE=1
 
-      - name: Collect outputs
+      - name: Locate build outputs
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p dist
 
-          DYLIB_PATH="$(find .theos -type f -name 'AdvancedAutoClicker.dylib' -print -quit)"
-          if [[ -z "$DYLIB_PATH" ]]; then
-            echo "AdvancedAutoClicker.dylib was not produced."
-            find .theos -maxdepth 6 -type f -print || true
+          echo "Searching for dylibs:"
+          find . -type f -name "*.dylib" -print
+
+          echo "Searching for deb packages:"
+          find . -type f -name "*.deb" -print
+
+      - name: Collect artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          mkdir -p artifacts
+
+          DYLIB_PATH="$(find .theos -type f -name "AdvancedAutoClicker.dylib" | head -n 1 || true)"
+
+          if [ -z "$DYLIB_PATH" ]; then
+            DYLIB_PATH="$(find . -type f -name "AdvancedAutoClicker.dylib" | head -n 1 || true)"
+          fi
+
+          if [ -z "$DYLIB_PATH" ]; then
+            echo "AdvancedAutoClicker.dylib was not found."
             exit 1
           fi
-          cp "$DYLIB_PATH" dist/AdvancedAutoClicker.dylib
 
-          DEB_PATH="$(find packages -type f -name '*.deb' -print | sort | tail -n 1)"
-          if [[ -z "$DEB_PATH" ]]; then
-            echo "No .deb package was produced."
-            find packages -maxdepth 3 -type f -print || true
-            exit 1
+          cp "$DYLIB_PATH" artifacts/AdvancedAutoClicker.dylib
+
+          DEB_PATH="$(find packages -type f -name "*.deb" | head -n 1 || true)"
+
+          if [ -n "$DEB_PATH" ]; then
+            cp "$DEB_PATH" artifacts/AdvancedAutoClicker.deb
+          else
+            echo "No .deb package found."
           fi
-          cp "$DEB_PATH" dist/AdvancedAutoClicker.deb
 
-          file dist/AdvancedAutoClicker.dylib
-          otool -L dist/AdvancedAutoClicker.dylib
-          shasum -a 256 dist/AdvancedAutoClicker.dylib dist/AdvancedAutoClicker.deb > dist/SHA256SUMS.txt
-          cat dist/SHA256SUMS.txt
+          cd artifacts
+
+          shasum -a 256 * > SHA256SUMS.txt
+
+          echo "Final artifacts:"
+          ls -lah
+
+      - name: Inspect dylib architecture
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          file artifacts/AdvancedAutoClicker.dylib
+          lipo -info artifacts/AdvancedAutoClicker.dylib || true
+          otool -L artifacts/AdvancedAutoClicker.dylib || true
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: AdvancedAutoClicker-${{ github.sha }}
-          path: dist/
+          name: AdvancedAutoClicker-${{ github.run_number }}
+          path: artifacts/
           if-no-files-found: error
           retention-days: 30
