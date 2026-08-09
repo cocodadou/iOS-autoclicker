@@ -1,1 +1,98 @@
+name: Build AdvancedAutoClicker
 
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - master
+    tags:
+      - "v*"
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build iOS tweak
+    runs-on: macos-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 1
+
+      - name: Select Xcode
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "Xcode path: $(xcode-select -p)"
+          xcodebuild -version
+          xcrun --sdk iphoneos --show-sdk-version
+
+      - name: Install build dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          brew install ldid xz dpkg
+
+      - name: Install Theos
+        shell: bash
+        run: |
+          set -euo pipefail
+          THEOS_DIR="$RUNNER_TEMP/theos"
+          git clone --recursive --depth 1 https://github.com/theos/theos.git "$THEOS_DIR"
+          echo "THEOS=$THEOS_DIR" >> "$GITHUB_ENV"
+
+      - name: Verify source dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f ZSFakeTouch/ZSFakeTouchDome/ZSFakeTouch/ZSFakeTouch.m
+          test -f ZSFakeTouch/ZSFakeTouchDome/ZSFakeTouch/ZSFakeTouch.h
+
+      - name: Build tweak and package
+        shell: bash
+        run: |
+          set -euo pipefail
+          make clean
+          make package FINALPACKAGE=1
+
+      - name: Collect outputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+
+          DYLIB_PATH="$(find .theos -type f -name 'AdvancedAutoClicker.dylib' -print -quit)"
+          if [[ -z "$DYLIB_PATH" ]]; then
+            echo "AdvancedAutoClicker.dylib was not produced."
+            find .theos -maxdepth 6 -type f -print || true
+            exit 1
+          fi
+          cp "$DYLIB_PATH" dist/AdvancedAutoClicker.dylib
+
+          DEB_PATH="$(find packages -type f -name '*.deb' -print | sort | tail -n 1)"
+          if [[ -z "$DEB_PATH" ]]; then
+            echo "No .deb package was produced."
+            find packages -maxdepth 3 -type f -print || true
+            exit 1
+          fi
+          cp "$DEB_PATH" dist/AdvancedAutoClicker.deb
+
+          file dist/AdvancedAutoClicker.dylib
+          otool -L dist/AdvancedAutoClicker.dylib
+          shasum -a 256 dist/AdvancedAutoClicker.dylib dist/AdvancedAutoClicker.deb > dist/SHA256SUMS.txt
+          cat dist/SHA256SUMS.txt
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: AdvancedAutoClicker-${{ github.sha }}
+          path: dist/
+          if-no-files-found: error
+          retention-days: 30
