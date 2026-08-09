@@ -128,9 +128,18 @@ AdvancedAutoClicker generates simulated touch events inside the target applicati
 
 Use the tweak only where automation is permitted and in accordance with the rules and terms of the applications or services you use.
 
+## Credits
+
+AdvancedAutoClicker uses [ZSFakeTouch](https://github.com/DYY-Studio/ZSFakeTouch) for simulated touch event generation.
+
+ZSFakeTouch is distributed under the MIT License. Copyright and license terms of the original project remain applicable to its source files.
+
+This project was also inspired in part by [iOS-SimpleAutoClicker](https://github.com/DYY-Studio/iOS-SimpleAutoClicker), which demonstrated the use of ZSFakeTouch in an injected iOS tweak environment.
+
+Thanks to the developers and contributors of Theos and the related open-source iOS tweak ecosystem.
+
 ## License
 
 MIT License
 
 Copyright (c) 2026 cocod
-
