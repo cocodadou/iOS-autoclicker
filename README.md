@@ -130,4 +130,7 @@ Use the tweak only where automation is permitted and in accordance with the rule
 
 ## License
 
-Add the license of your choice to the repository before redistributing the project. Also make sure to comply with the licenses of included or downloaded dependencies.
+MIT License
+
+Copyright (c) 2026 cocod
+
