@@ -44,6 +44,7 @@
 
 @property(nonatomic,strong) UIView *presetPanel;
 @property(nonatomic,strong) UILabel *presetStatusLabel;
+@property(nonatomic,strong) NSMutableArray<UITextField *> *presetNameFields;
 
 @property(nonatomic,strong) NSMutableArray<ACPoint *> *points;
 @property(nonatomic,strong) ACPoint *selectedPoint;
@@ -79,6 +80,7 @@
         _initialDelay = 0.0;
         _loopCount = 0;
         _keyboardVisible = NO;
+        _presetNameFields = [NSMutableArray array];
         [self loadSettings];
 
         [[NSNotificationCenter defaultCenter] addObserver:self
@@ -99,6 +101,11 @@
 - (NSString *)settingsKey {
     NSString *bundleID = NSBundle.mainBundle.bundleIdentifier ?: @"unknown";
     return [@"AdvancedAutoClicker.v3.current." stringByAppendingString:bundleID];
+}
+
+- (NSString *)presetNameKeyForSlot:(NSInteger)slot {
+    NSString *bundleID = NSBundle.mainBundle.bundleIdentifier ?: @"unknown";
+    return [NSString stringWithFormat:@"AdvancedAutoClicker.v4.presetName.%@.%ld", bundleID, (long)slot];
 }
 
 - (NSString *)presetKeyForSlot:(NSInteger)slot {
@@ -186,21 +193,52 @@
                                            forKey:[self settingsKey]];
 }
 
+- (NSString *)presetNameForSlot:(NSInteger)slot {
+    NSString *name = [NSUserDefaults.standardUserDefaults stringForKey:[self presetNameKeyForSlot:slot]];
+    if (name.length == 0) {
+        return [NSString stringWithFormat:@"Preset %ld", (long)slot];
+    }
+    return name;
+}
+
+- (void)savePresetName:(NSString *)name forSlot:(NSInteger)slot {
+    NSString *trimmed = [name stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet];
+
+    if (trimmed.length == 0) {
+        [NSUserDefaults.standardUserDefaults removeObjectForKey:[self presetNameKeyForSlot:slot]];
+    } else {
+        [NSUserDefaults.standardUserDefaults setObject:trimmed
+                                               forKey:[self presetNameKeyForSlot:slot]];
+    }
+}
+
+- (void)refreshPresetNameFields {
+    [self.presetNameFields enumerateObjectsUsingBlock:^(UITextField *field, NSUInteger idx, BOOL *stop) {
+        field.text = [self presetNameForSlot:(NSInteger)idx + 1];
+    }];
+}
+
 - (void)savePresetSlot:(NSInteger)slot {
     [self commitFields];
+
+    if (slot >= 1 && slot <= self.presetNameFields.count) {
+        UITextField *nameField = self.presetNameFields[(NSUInteger)slot - 1];
+        [self savePresetName:nameField.text forSlot:slot];
+    }
 
     NSDictionary *configuration = [self serializedConfiguration];
     [NSUserDefaults.standardUserDefaults setObject:configuration
                                            forKey:[self presetKeyForSlot:slot]];
 
-    self.presetStatusLabel.text = [NSString stringWithFormat:@"Preset %ld saved", (long)slot];
+    NSString *name = [self presetNameForSlot:slot];
+    self.presetStatusLabel.text = [NSString stringWithFormat:@"%@ saved", name];
 }
 
 - (void)loadPresetSlot:(NSInteger)slot {
     NSDictionary *saved = [NSUserDefaults.standardUserDefaults dictionaryForKey:[self presetKeyForSlot:slot]];
 
     if (!saved) {
-        self.presetStatusLabel.text = [NSString stringWithFormat:@"Preset %ld is empty", (long)slot];
+        self.presetStatusLabel.text = [NSString stringWithFormat:@"%@ is empty", [self presetNameForSlot:slot]];
         return;
     }
 
@@ -212,7 +250,7 @@
     [self applyConfiguration:saved rebuildMarkers:YES];
     [self saveSettings];
 
-    self.presetStatusLabel.text = [NSString stringWithFormat:@"Preset %ld loaded", (long)slot];
+    self.presetStatusLabel.text = [NSString stringWithFormat:@"%@ loaded", [self presetNameForSlot:slot]];
 }
 
 #pragma mark - Keyboard
@@ -320,6 +358,28 @@
     return field;
 }
 
+- (UITextField *)nameFieldWithFrame:(CGRect)frame {
+    UITextField *field = [[UITextField alloc] initWithFrame:frame];
+    field.backgroundColor = [UIColor colorWithWhite:1.0 alpha:0.12];
+    field.textColor = UIColor.whiteColor;
+    field.tintColor = UIColor.whiteColor;
+    field.textAlignment = NSTextAlignmentLeft;
+    field.layer.cornerRadius = 8.0;
+    field.font = [UIFont systemFontOfSize:13.0];
+    field.clearButtonMode = UITextFieldViewModeWhileEditing;
+    field.autocorrectionType = UITextAutocorrectionTypeNo;
+    field.autocapitalizationType = UITextAutocapitalizationTypeSentences;
+    field.returnKeyType = UIReturnKeyDone;
+    field.delegate = self;
+    field.inputAccessoryView = [self keyboardToolbar];
+
+    UIView *padding = [[UIView alloc] initWithFrame:CGRectMake(0, 0, 8, 1)];
+    field.leftView = padding;
+    field.leftViewMode = UITextFieldViewModeAlways;
+
+    return field;
+}
+
 - (void)commitFields {
     if (self.globalPanel && !self.globalPanel.hidden) {
         self.initialDelay = MAX(0.0, self.initialDelayField.text.doubleValue);
@@ -330,6 +390,12 @@
         self.selectedPoint.delayAfter = MAX(0.0, self.pointDelayField.text.doubleValue);
         self.selectedPoint.holdDuration = MAX(0.001, self.pointHoldField.text.doubleValue);
         self.selectedPoint.repeats = MAX(1, self.pointRepeatField.text.integerValue);
+    }
+
+    if (self.presetPanel && !self.presetPanel.hidden) {
+        [self.presetNameFields enumerateObjectsUsingBlock:^(UITextField *field, NSUInteger idx, BOOL *stop) {
+            [self savePresetName:field.text forSlot:(NSInteger)idx + 1];
+        }];
     }
 
     [self saveSettings];
@@ -630,7 +696,7 @@
 #pragma mark - Presets panel
 
 - (void)buildPresetPanel {
-    self.presetPanel = [[UIView alloc] initWithFrame:CGRectMake(24, 110, 300, 390)];
+    self.presetPanel = [[UIView alloc] initWithFrame:CGRectMake(18, 92, 330, 438)];
     self.presetPanel.backgroundColor = [UIColor colorWithWhite:0.04 alpha:0.97];
     self.presetPanel.layer.cornerRadius = 18.0;
     self.presetPanel.hidden = YES;
@@ -643,12 +709,12 @@
     [self.presetPanel addSubview:title];
 
     UIButton *close = [self buttonWithTitle:@"×"
-                                      frame:CGRectMake(248, 10, 36, 32)
+                                      frame:CGRectMake(278, 10, 36, 32)
                                      action:@selector(togglePresetPanel)];
     [self.presetPanel addSubview:close];
 
-    self.presetStatusLabel = [self labelWithText:@"Save or load a complete layout"
-                                          frame:CGRectMake(16, 47, 268, 24)
+    self.presetStatusLabel = [self labelWithText:@"Name, save or load a complete layout"
+                                          frame:CGRectMake(16, 47, 298, 24)
                                        fontSize:12];
     self.presetStatusLabel.textColor = [UIColor colorWithWhite:0.82 alpha:1.0];
     [self.presetPanel addSubview:self.presetStatusLabel];
@@ -656,28 +722,29 @@
     CGFloat y = 82.0;
 
     for (NSInteger slot = 1; slot <= 5; slot++) {
-        UILabel *slotLabel = [self labelWithText:[NSString stringWithFormat:@"Preset %ld", (long)slot]
-                                          frame:CGRectMake(16, y, 75, 38)
-                                       fontSize:14];
-        [self.presetPanel addSubview:slotLabel];
+        UITextField *nameField = [self nameFieldWithFrame:CGRectMake(16, y, 154, 38)];
+        nameField.text = [self presetNameForSlot:slot];
+        nameField.tag = slot;
+        [self.presetNameFields addObject:nameField];
+        [self.presetPanel addSubview:nameField];
 
         UIButton *load = [self buttonWithTitle:@"Load"
-                                         frame:CGRectMake(95, y, 84, 38)
+                                         frame:CGRectMake(178, y, 64, 38)
                                         action:@selector(loadPresetButton:)];
         load.tag = slot;
         [self.presetPanel addSubview:load];
 
         UIButton *save = [self buttonWithTitle:@"Save"
-                                         frame:CGRectMake(188, y, 84, 38)
+                                         frame:CGRectMake(250, y, 64, 38)
                                         action:@selector(savePresetButton:)];
         save.tag = slot;
         [self.presetPanel addSubview:save];
 
-        y += 52.0;
+        y += 54.0;
     }
 
     UIButton *done = [self buttonWithTitle:@"Done"
-                                     frame:CGRectMake(16, 342, 256, 38)
+                                     frame:CGRectMake(16, 372, 298, 42)
                                     action:@selector(togglePresetPanel)];
     [self.presetPanel addSubview:done];
 
@@ -708,7 +775,8 @@
     self.presetPanel.hidden = !willShow;
 
     if (willShow) {
-        self.presetStatusLabel.text = @"Save or load a complete layout";
+        [self refreshPresetNameFields];
+        self.presetStatusLabel.text = @"Name, save or load a complete layout";
     }
 }
 
