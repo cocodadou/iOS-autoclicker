@@ -1,79 +1,133 @@
 # AdvancedAutoClicker
 
-Autoclicker iOS générique destiné à être injecté dans une application, notamment via LiveContainer ou un injecteur de tweaks compatible.
+AdvancedAutoClicker is an iOS tweak that provides a simple, visual autoclicker interface for sideloaded applications. Instead of entering screen coordinates manually, you can place and drag numbered click points directly on top of the app.
 
-## Fonctions
+Each click point can have its own timing settings, and complete layouts can be saved as named presets for quick reuse.
 
-- Jusqu'à 20 points indépendants
-- Délai propre à chaque point, de 1 ms à des valeurs très longues
-- Durée d'appui configurable par point
-- Nombre de répétitions configurable par point
-- Décalage aléatoire optionnel des coordonnées
-- Délai initial avant démarrage
-- Nombre de boucles fini ou infini
-- Sauvegarde des réglages par application
-- Contrôles flottants `SET` et `GO/STOP`
-- Injection tactile basée sur ZSFakeTouch
+## Features
 
-## Compiler sans Mac avec GitHub Actions
+- Draggable click points directly on screen
+- Numbered points showing the execution order
+- Per-point delay after each click
+- Per-point hold duration
+- Per-point repeat count
+- Configurable initial delay before starting
+- Finite or infinite loop mode
+- Floating Start/Stop control
+- Movable control panel
+- Automatic configuration persistence
+- Five named preset slots
+- Save and restore complete point layouts
+- Keyboard-safe editing with a Done button
+- Automatic panel repositioning when the keyboard appears
 
-Le dépôt contient déjà `.github/workflows/build.yml`.
+## Presets
 
-1. Créez un nouveau dépôt GitHub.
-2. Envoyez **tout le contenu de ce dossier**, y compris `.gitmodules` et `.github/`.
-3. Ouvrez l'onglet **Actions** du dépôt.
-4. Sélectionnez **Build AdvancedAutoClicker**.
-5. Appuyez sur **Run workflow**.
-6. Attendez la fin du job `Build iOS tweak`.
-7. Ouvrez l'exécution terminée et téléchargez l'artifact `AdvancedAutoClicker-...`.
+AdvancedAutoClicker includes five preset slots.
 
-L'artifact contient :
+Each preset can be given a custom name and stores the complete autoclicker configuration, including:
+
+- Click point positions
+- Delay after each point
+- Hold duration
+- Repeat count
+- Initial delay
+- Loop count
+
+Open **Settings → Presets**, enter a name for the preset, then press **Save**.
+
+Press **Load** at any time to restore that layout.
+
+## Controls
+
+### Floating toolbar
+
+The floating toolbar contains two buttons:
+
+- **Settings** — opens the configuration panel
+- **Play / Stop** — starts or stops the click sequence
+
+The toolbar itself can be dragged around the screen.
+
+### Adding click points
+
+Open the settings panel and press **+ Add point**.
+
+A numbered point appears on screen. Drag it directly to the location you want to tap.
+
+Tap the point itself to edit its individual settings.
+
+### Point settings
+
+Each point supports:
+
+- **Wait after tap** — time to wait before moving to the next point
+- **Hold duration** — how long the simulated touch remains pressed
+- **Repeat count** — how many times the point is tapped before continuing
+
+This allows every point in a sequence to use a different delay.
+
+For example:
 
 ```text
-AdvancedAutoClicker.dylib
-AdvancedAutoClicker.deb
-SHA256SUMS.txt
+Point 1 → tap → wait 0.5 seconds
+Point 2 → tap → wait 4 seconds
+Point 3 → tap → wait 1.2 seconds
+Point 4 → tap → wait 10 seconds
+→ repeat
 ```
 
-Pour LiveContainer, importez `AdvancedAutoClicker.dylib` dans **Tweaks**, puis utilisez le bouton **Signer** avant de l'activer pour l'application souhaitée.
+## Building
 
-Pour un injecteur prenant en charge les paquets Debian, vous pouvez utiliser `AdvancedAutoClicker.deb`.
+The project is designed to be built with Theos.
 
-## Déclenchement automatique
+The included GitHub Actions workflow can compile the tweak automatically on a GitHub-hosted macOS runner, so a local Mac is not required.
 
-Le workflow compile également lors :
+To build with GitHub Actions:
 
-- d'un push sur `main` ou `master` ;
-- d'une pull request ;
-- d'un tag commençant par `v`.
+1. Fork or upload the repository to GitHub.
+2. Open the **Actions** tab.
+3. Select the build workflow.
+4. Run the workflow.
+5. Wait for the build to finish.
+6. Download the generated artifact.
 
-Aucun certificat Apple, fichier `.p12`, provisioning profile ou secret GitHub n'est nécessaire pour produire la dylib destinée à LiveContainer. LiveContainer peut ensuite signer la dylib avec son propre mécanisme de signature.
+The artifact contains the compiled tweak files.
 
-## Compilation locale facultative
+## Dependencies
 
-Avec Theos déjà installé :
+The project uses:
 
-```bash
-./build.sh
-```
+- Theos
+- ZSFakeTouch
+- UIKit
+- Foundation
+- CoreGraphics
+- QuartzCore
+- IOKit
 
-Les sorties sont copiées dans `dist/`.
+ZSFakeTouch is downloaded automatically by the GitHub Actions workflow during compilation.
 
-## Structure
+## Installation
 
-```text
-.github/workflows/build.yml     GitHub Actions
-.gitmodules                     Dépendance ZSFakeTouch
-AdvancedAutoClicker.plist       Filtre de tweak
-Makefile                        Configuration Theos
-Tweak.x                         Code du tweak
-build.sh                        Build local facultatif
-control                         Métadonnées du paquet .deb
-LICENSE                         Licence
-```
+The compiled `.dylib` is intended for environments capable of injecting tweaks into sideloaded iOS applications.
+
+For LiveContainer, import the compiled dylib into the Tweaks section, sign it if required by your setup, and enable it for the desired application.
+
+Compatibility can vary depending on the target application, iOS version, injection environment, and the way the application processes touch events.
+
+## Configuration storage
+
+The current configuration and named presets are stored using `NSUserDefaults`.
+
+Configurations are stored per application bundle identifier, which prevents layouts from one application from automatically replacing layouts created for another application.
 
 ## Notes
 
-La compatibilité dépend de l'application cible et de son système d'entrée. Certaines applications utilisant des piles d'entrée ou de rendu particulières peuvent ne pas accepter les événements tactiles synthétiques.
+AdvancedAutoClicker generates simulated touch events inside the target application. Some applications may use custom input systems or other mechanisms that do not respond to simulated touches in the same way as standard UIKit interfaces.
 
-Le projet utilise ZSFakeTouch depuis `DYY-Studio/ZSFakeTouch` comme sous-module Git. Conservez les notices de licence du projet amont lors d'une redistribution.
+Use the tweak only where automation is permitted and in accordance with the rules and terms of the applications or services you use.
+
+## License
+
+Add the license of your choice to the repository before redistributing the project. Also make sure to comply with the licenses of included or downloaded dependencies.
