@@ -243,21 +243,58 @@
     return CGPointMake(p.point.x+dx,p.point.y+dy);
 }
 
+- (void)performTapForPoint:(ACPoint *)p
+                 remaining:(NSInteger)remaining
+                completion:(dispatch_block_t)completion {
+    if (!self.running || remaining <= 0) {
+        if (completion) completion();
+        return;
+    }
+
+    CGPoint q = [self jitteredPoint:p];
+    [ZSFakeTouch beginTouchWithPoint:q];
+
+    NSTimeInterval holdDuration = MAX(0.001, p.holdDuration);
+    __weak typeof(self) weakSelf = self;
+
+    dispatch_after(
+        dispatch_time(DISPATCH_TIME_NOW, (int64_t)(holdDuration * NSEC_PER_SEC)),
+        dispatch_get_main_queue(),
+        ^{
+            [ZSFakeTouch endTouchWithPoint:q];
+
+            __strong typeof(weakSelf) strongSelf = weakSelf;
+            if (!strongSelf || !strongSelf.running) {
+                if (completion) completion();
+                return;
+            }
+
+            NSInteger nextRemaining = remaining - 1;
+            if (nextRemaining > 0) {
+                dispatch_after(
+                    dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.03 * NSEC_PER_SEC)),
+                    dispatch_get_main_queue(),
+                    ^{
+                        __strong typeof(weakSelf) innerSelf = weakSelf;
+                        if (!innerSelf || !innerSelf.running) {
+                            if (completion) completion();
+                            return;
+                        }
+                        [innerSelf performTapForPoint:p
+                                           remaining:nextRemaining
+                                          completion:completion];
+                    }
+                );
+            } else if (completion) {
+                completion();
+            }
+        }
+    );
+}
+
 - (void)tapPoint:(ACPoint *)p completion:(dispatch_block_t)completion {
-    __block NSInteger remaining = MAX(1,p.repeats);
-    __weak typeof(self) weakSelf=self;
-    __block void (^oneTap)(void);
-    oneTap = ^{
-        if (!weakSelf.running || remaining<=0) { if(completion) completion(); return; }
-        CGPoint q=[weakSelf jitteredPoint:p];
-        [ZSFakeTouch beginTouchWithPoint:q];
-        dispatch_after(dispatch_time(DISPATCH_TIME_NOW,(int64_t)(p.holdDuration*NSEC_PER_SEC)),dispatch_get_main_queue(),^{
-            [ZSFakeTouch endTouchWithPoint:q]; remaining--;
-            if (remaining>0) dispatch_after(dispatch_time(DISPATCH_TIME_NOW,(int64_t)(0.03*NSEC_PER_SEC)),dispatch_get_main_queue(),oneTap);
-            else if(completion) completion();
-        });
-    };
-    oneTap();
+    NSInteger repeats = MAX(1, p.repeats);
+    [self performTapForPoint:p remaining:repeats completion:completion];
 }
 
 - (NSInteger)nextEnabledIndexFrom:(NSInteger)start {
