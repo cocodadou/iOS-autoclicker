@@ -141,5 +141,3 @@ Thanks to the developers and contributors of Theos and the related open-source i
 ## License
 
 MIT License
-
-Copyright (c) 2026 cocod
