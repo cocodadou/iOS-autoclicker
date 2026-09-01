@@ -25,8 +25,8 @@ Each click point can have its own timing settings, and complete layouts can be s
 Jailbreaking is not necessary to use this autoclicker.
 
 To use it without a jailbreak, you'll need a sideloading app which supports injecting .deb or .dylib files into apps.
-For example, you can use (https://github.com/LiveContainer/LiveContainer)[LiveContainer] and import the .dylib file located in (https://github.com/cocodadou/iOS-autoclicker/releases)[Releases] in the tweaks tab.
-Or you can use an app like (https://github.com/claration/Feather)[Feather] to inject the .deb file when signing the ipa
+For example, you can use [LiveContainer](https://github.com/LiveContainer/LiveContainer) and import the .dylib file located in [Releases](https://github.com/cocodadou/iOS-autoclicker/releases) in the tweaks tab.
+Or you can use an app like [Feather](https://github.com/claration/Feather) to inject the .deb file when signing the ipa
 After injecting the autoclicker in your app and opening it, you should see a menu to configure the Autoclicker.
 Congrats! You have successfully installed the autoclicker!
 
